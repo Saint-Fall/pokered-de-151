@@ -17,7 +17,7 @@ Rote Edition (151) and Blaue Edition (151) only differ in the title screen and t
 - Bugfixes and tweaks regarding Pokémon types and matchups
   - Ghost is now super effective against Psychic as in later generations (before Psychic was immune to Ghost)
   - Ice is now not very effective against Fire as in later generations (before Fire was neutral to Ice)
-  - all Fly type Pokémon can learn HM Fly
+  - All Fly type Pokémon can learn HM Fly
   
 - Bugfixes regarding battles and moves
   - Focus Energy actually works as intended now (multiplies critical hit rate by 4 instead of dividing it by 4)
@@ -32,11 +32,11 @@ Rote Edition (151) and Blaue Edition (151) only differ in the title screen and t
   - Learning moves after evolution works correctly now
   - Cap Light Screen / Reflect stat boosts to 999 to prevent overflows
   - While transformed into another Pokémon via Transform, you cannot swap your move positions anymore - allowing this caused glitches that end with the game crashing
+  - LT Surge says the Thunderbadge boosts speed, but in the code it actually boosted defense. Now it boosts speed as the text indicated
+  - Koga says the Soulbadge boosts defense, but in the code it actually boosted speed. Now it boosts defense as the text indicated
 
 - General bugfixes
   - Nidorino's cry plays correctly in Oak's introduction now instead of Nidorina's
-  - LT Surge says the Thunderbadge boosts speed, but in the code it actually boosted defense. Now it boosts speed as the text indicated
-  - Koga says the Soulbadge boosts defense, but in the code it actually boosted speed. Now it boosts defense as the text indicated
   - Prevent buffer overflow to not corrupt Hall of Fame data
 
 ## Releases and build
