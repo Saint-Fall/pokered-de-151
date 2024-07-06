@@ -859,7 +859,12 @@ wRightGBMonSpecies:: db
 ; bit 6: tried pushing against boulder once (you need to push twice before it will move)
 wFlags_0xcd60:: db
 
-	ds 9
+;;;;;;;;;; SF: CHANGED: this previously empty space of 9 bytes is used by two new variables, leaving now 5 bytes unused
+wDamageIntention:: dw ; in battle, the amount of damage a move will do before doing it (used for high jump kick / jump kick crash effect)
+;;;;;;;;;; Storing temporary level in battle
+wTempLevelStore:: dw
+
+	ds 5
 
 ; This has overlapping related uses.
 ; When the player tries to use an item or use certain field moves, 0 is stored
@@ -1035,7 +1040,10 @@ wPartyMenuHPBarColors:: ds PARTY_LENGTH
 
 wStatusScreenHPBarColor:: db
 
-	ds 7
+; shinpokerednote: ADDED: tracker for the levels of each of the player's pokemon at the start of battle
+wStartBattleLevels:: ds PARTY_LENGTH
+
+	ds 1
 
 wCopyingSGBTileData::
 wWhichPartyMenuHPBar::
@@ -1652,7 +1660,9 @@ wSavedSpriteScreenX:: db
 wSavedSpriteMapY:: db
 wSavedSpriteMapX:: db
 
-	ds 5
+	ds 4
+
+wWhatStat:: db ; contains the stat currently being modified by a stat changing move	
 
 wWhichPrize:: db
 

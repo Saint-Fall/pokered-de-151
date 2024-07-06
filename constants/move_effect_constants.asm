@@ -39,7 +39,7 @@
 	const SLEEP_EFFECT               ; $20
 	const POISON_SIDE_EFFECT2        ; $21
 	const BURN_SIDE_EFFECT2          ; $22
-	const_skip                       ; $23
+	const SPEED_UP_SIDE_EFFECT       ; $23 ; PureRGBnote: ADDED: new effect, used in meditate
 	const PARALYZE_SIDE_EFFECT2      ; $24
 	const FLINCH_SIDE_EFFECT2        ; $25
 	const OHKO_EFFECT                ; $26 moves like Horn Drill
@@ -76,7 +76,7 @@
 	const DEFENSE_DOWN_SIDE_EFFECT   ; $45
 	const SPEED_DOWN_SIDE_EFFECT     ; $46
 	const SPECIAL_DOWN_SIDE_EFFECT   ; $47
-	const_skip                       ; $48
+	const ATTACK_UP_SIDE_EFFECT      ; $48 ; used in bide, sharpen, submission and meditate
 	const_skip                       ; $49
 	const_skip                       ; $4A
 	const_skip                       ; $4B

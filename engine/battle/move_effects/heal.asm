@@ -4,20 +4,29 @@ HealEffect_:
 	ld de, wBattleMonHP
 	ld hl, wBattleMonMaxHP
 	ld a, [wPlayerMoveNum]
-	jr z, .healEffect
+	jr z, HealEffectCommon
 	ld de, wEnemyMonHP
 	ld hl, wEnemyMonMaxHP
 	ld a, [wEnemyMoveNum]
-.healEffect
+;;;;;;;;;; shinpokerednote: FIXED: HP recovery bug where the move fails when HP is 255 or 511 less than max HP
+HealEffectCommon:
+	;h holds high byte of maxHP, l holds low byte of maxHP
+	;d holds high byte of curHP, e holds low byte of curHP
 	ld b, a
-	ld a, [de]
-	cp [hl] ; most significant bytes comparison is ignored
+	ld a, [de]	;load d into a
+	cp [hl] 	;compare a with h
+			; most significant bytes comparison is ignored
 	        ; causes the move to miss if max HP is 255 or 511 points higher than the current HP
-	inc de
-	inc hl
-	ld a, [de]
-	sbc [hl]
+	;assume h >= d. it does not matter what d or h are, c_flag = 1 if h != d so assume h > d
+	inc de	;incrementing 16-bit registers does not change the flag register
+	inc hl	; however, it does get us working with e & l
+	jr nz, .passed	; if c_flag is set, then h is > d and therefore hl is assumed > de. we can stop checking here
+	ld a, [de]	;if h = d, then load e into a. again, assume l >= e
+	sbc [hl]	;c_flag is still 0. compare a with l. 
+	;A a zero flag means both h and d as well as l and e are equal pairs. hl = de, so already at full hp!
 	jp z, .failed ; no effect if user's HP is already at its maximum
+.passed
+;;;;;;;;;;
 	ld a, b
 	cp REST
 	jr nz, .healHP
@@ -32,6 +41,9 @@ HealEffect_:
 	jr z, .restEffect
 	ld hl, wEnemyMonStatus
 .restEffect
+	push hl
+	callfar UndoBurnParStats ; shinpokerednote: FIXED: remove negative effects of burn/paralyze on stats before healing
+	pop hl
 	ld a, [hl]
 	and a
 	ld [hl], 2 ; clear status and set number of turns asleep to 2
@@ -44,12 +56,15 @@ HealEffect_:
 	pop de
 	pop hl
 .healHP
+	push af
 	ld a, [hld]
 	ld [wHPBarMaxHP], a
 	ld c, a
 	ld a, [hl]
 	ld [wHPBarMaxHP+1], a
 	ld b, a
+	pop af
+	cp REST
 	jr z, .gotHPAmountToHeal
 ; Recover and Softboiled only heal for half the mon's max HP
 	srl b

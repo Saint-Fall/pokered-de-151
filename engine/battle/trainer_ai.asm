@@ -622,7 +622,7 @@ AIUseFullHeal:
 	ld a, FULL_HEAL
 	jp AIPrintItemUse
 
-AICureStatus:
+AICureStatus:	;shinpokerednote: CHANGED: modified to be more robust and also undo stat changes of brn/par
 ; cures the status of enemy's active pokemon
 	ld a, [wEnemyMonPartyPos]
 	ld hl, wEnemyMon1Status
@@ -630,7 +630,15 @@ AICureStatus:
 	call AddNTimes
 	xor a
 	ld [hl], a ; clear status in enemy team roster
-	ld [wEnemyMonStatus], a ; clear status of active enemy
+	ldh a, [hWhoseTurn]
+	push af
+	ld a, $01 	;forcibly set it to the AI's turn
+	ldh [hWhoseTurn], a
+	farcall UndoBurnParStats	;undo brn/par stat changes
+	pop af
+	ldh [hWhoseTurn], a
+	xor a
+	ld [wEnemyMonStatus], a ; clear status in active enemy data
 	ld hl, wEnemyBattleStatus3
 	res 0, [hl]
 	ret

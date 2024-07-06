@@ -748,6 +748,13 @@ ExtraWarpCheck::
 
 MapEntryAfterBattle::
 	farcall IsPlayerStandingOnWarp ; for enabling warp testing after collisions
+;;;;;;;;;; PureRGBnote: ADDED: skip fading in in maps that use a specific bit in their header - allows tile block replacements to go unseen
+	ld a, [wMapConnections]
+	bit BIT_DEFER_SHOWING_MAP, a
+	ret nz
+;;;;;;;;;;
+	; fall through
+MapFadeAfterBattle::
 	ld a, [wMapPalOffset]
 	and a
 	jp z, GBFadeInFromWhite
@@ -1970,11 +1977,21 @@ RunMapScript::
 	ld a, [hli]
 	ld h, [hl]
 	ld l, a
-	ld de, .return
-	push de
-	jp hl ; jump to script
-.return
-	ret
+	call hl_caller ; jump to script
+;;;;;;;;;; PureRGBnote: ADDED: code that will fade back in after battle in specific maps with a bit in their header
+;;;;;;;;;; used to keep tileblock replacements unseen
+	ld hl, wCurrentMapScriptFlags
+	bit 3, [hl]
+	res 3, [hl]
+	ret z
+	ld a, [wMapConnections]
+	bit BIT_DEFER_SHOWING_MAP, a
+	ret z
+	ld a, [wIsInBattle]
+	cp $ff
+	ret z
+	jp MapFadeAfterBattle
+;;;;;;;;;;
 
 LoadWalkingPlayerSpriteGraphics::
 	ld de, RedSprite

@@ -54,23 +54,18 @@ MtMoonB2F_ScriptPointers:
 
 MtMoon3Script0:
 	CheckEvent EVENT_BEAT_MT_MOON_EXIT_SUPER_NERD
-	jp nz, MtMoon3Script_49d91
+	jp nz, CheckFightingMapTrainers ; PureRGBnote: FIXED: allow trainers to sight player regardless of if you obtained fossils
 	ld a, [wYCoord]
 	cp 8
-	jp nz, MtMoon3Script_49d91
+	jp nz, CheckFightingMapTrainers ; PureRGBnote: FIXED: allow trainers to sight player regardless of if you obtained fossils
 	ld a, [wXCoord]
 	cp 13
-	jp nz, MtMoon3Script_49d91
+	jp nz, CheckFightingMapTrainers ; PureRGBnote: FIXED: allow trainers to sight player regardless of if you obtained fossils
 	xor a
 	ldh [hJoyHeld], a
 	ld a, $1
 	ldh [hSpriteIndexOrTextID], a
 	jp DisplayTextID
-
-MtMoon3Script_49d91:
-	CheckEitherEventSet EVENT_GOT_DOME_FOSSIL, EVENT_GOT_HELIX_FOSSIL
-	jp z, CheckFightingMapTrainers
-	ret
 
 MtMoon3Script3:
 	ld a, [wIsInBattle]
@@ -139,16 +134,27 @@ MtMoon3Script5:
 	ldh [hSpriteIndexOrTextID], a
 	call DisplayTextID
 	CheckEvent EVENT_GOT_DOME_FOSSIL
-	jr z, .asm_49e1d
-	ld a, HS_MT_MOON_B2F_FOSSIL_2
-	jr .asm_49e1f
-.asm_49e1d
 	ld a, HS_MT_MOON_B2F_FOSSIL_1
-.asm_49e1f
+	jr z, .continue
+	ld a, HS_MT_MOON_B2F_FOSSIL_2
+.continue
 	ld [wMissableObjectIndex], a
 	predef HideObject
 	xor a
 	ld [wJoyIgnore], a
+;;;;;;;;;; PureRGBnote: ADDED: hide or show the fossil in seafoam islands depending on what you chose
+	CheckEvent EVENT_GOT_DOME_FOSSIL
+	ld a, HS_SEAFOAM_ISLANDS_B3F_DOME_FOSSIL
+	jr nz, .hideObjectSeafoam
+	CheckEvent EVENT_GOT_HELIX_FOSSIL
+	ld a, HS_SEAFOAM_ISLANDS_B3F_HELIX_FOSSIL
+	jr z, .done
+.hideObjectSeafoam
+	ld [wMissableObjectIndex], a
+	predef HideObject
+;;;;;;;;;;
+.done
+	; done
 	ld a, $0
 	ld [wMtMoonB2FCurScript], a
 	ld [wCurMapScript], a

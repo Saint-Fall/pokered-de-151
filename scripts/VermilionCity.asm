@@ -50,8 +50,12 @@ VermilionCityScript0:
 	ld a, $3
 	ldh [hSpriteIndexOrTextID], a
 	call DisplayTextID
+	ld a, [wObtainedBadges] ; PureRGBnote: CHANGED: ship returns after obtaining the soul badge so let the player in if they have the ticket
+	bit 4, a
+	jr nz, .default
 	CheckEvent EVENT_SS_ANNE_LEFT
 	jr nz, .shipHasDeparted
+.default
 	ld b, S_S_TICKET
 	predef GetQuantityOfItemInBag
 	ld a, b
@@ -155,8 +159,12 @@ VermilionCityTextSSAnneDeparted:
 
 VermilionCityText3:
 	text_asm
+	ld a, [wObtainedBadges]
+	bit BIT_SOULBADGE, a ; PureRGBnote: CHANGED: after obtaining soul badge the ship returns so this NPC will talk about it
+	jr nz, .default
 	CheckEvent EVENT_SS_ANNE_LEFT
 	jr nz, .shipHasDeparted
+.default
 	ld a, [wSpritePlayerStateData1FacingDirection]
 	cp SPRITE_FACING_RIGHT
 	jr z, .greetPlayer
@@ -231,9 +239,24 @@ VermilionCityText5:
 VermilionCityText14:
 	text_far _VermilionCityText14
 	text_end
-
+	
 VermilionCityText6:
+	text_asm
+	ld a, [wObtainedBadges]
+	bit BIT_SOULBADGE, a ; after obtaining the soul badge the ship returns
+	jr z, .default
+	ld hl, .ShipBackText15
+	ret
+.default
+	ld hl, .VCText6
+	ret
+	
+.VCText6:
 	text_far _VermilionCityText6
+	text_end
+	
+.ShipBackText15:
+	text_far _VermilionCityText15
 	text_end
 
 VermilionCityText7:

@@ -356,6 +356,19 @@ StatModifierUpEffect:
 	ld de, wEnemyMoveEffect
 .statModifierUpEffect
 	ld a, [de]
+;;;;;;;;;; PureRGBnote: ADDED: need to decide which stat is being modified here and store it so we can apply correct badge boosts if necessary
+	push af
+	call MapEffectToStat
+	ld [wWhatStat], a
+	pop af
+	call MapSideEffectToStatMod
+	cp $ff
+	jr nz, .continue
+.loadDefault
+	ld a, [de]
+.continue
+	ld d, a
+;;;;;;;;;;
 	sub ATTACK_UP1_EFFECT
 	cp EVASION_UP1_EFFECT + $3 - ATTACK_UP1_EFFECT ; covers all +1 effects
 	jr c, .incrementStatMod
@@ -366,14 +379,16 @@ StatModifierUpEffect:
 	add hl, bc
 	ld b, [hl]
 	inc b ; increment corresponding stat mod
-	ld a, $d
+	ld a, MAX_STAT_LEVEL
 	cp b ; can't raise stat past +6 ($d or 13)
 	jp c, PrintNothingHappenedText
-	ld a, [de]
+;;;;;;;;;; PureRGBnote: ADDED: need to decide which stat is being modified here and store it so we can apply correct badge boosts if necessary
+	ld a, d ; remapped stat mod
+;;;;;;;;;;
 	cp ATTACK_UP1_EFFECT + $8 ; is it a +2 effect?
 	jr c, .ok
 	inc b ; if so, increment stat mod again
-	ld a, $d
+	ld a, MAX_STAT_LEVEL
 	cp b ; unless it's already +6
 	jr nc, .ok
 	ld b, a
@@ -494,14 +509,31 @@ UpdateStatDone:
 .applyBadgeBoostsAndStatusPenalties
 	ldh a, [hWhoseTurn]
 	and a
-	call z, ApplyBadgeStatBoosts ; whenever the player uses a stat-up move, badge boosts get reapplied again to every stat,
+	call z, ApplyBadgeBoostsForSpecificStat ; whenever the player uses a stat-up move, badge boosts get reapplied again to every stat,
 	                             ; even to those not affected by the stat-up move (will be boosted further)
+	                             ; PureRGBnote: FIXED: badge boosts only applied to the specific stat being modified
 	ld hl, MonsStatsRoseText
 	call PrintText
 
-; these shouldn't be here
-	call QuarterSpeedDueToParalysis ; apply speed penalty to the player whose turn is not, if it's paralyzed
-	jp HalveAttackDueToBurn ; apply attack penalty to the player whose turn is not, if it's burned
+; these always run on the opponent, and run regardless of what stat was modified
+;;;;;;;;;;; PureRGBnote: FIXED: These ran on the opponent's stats erroneously
+;;;;;;;;;;; PureRGBnote: FIXED: These only run if the specific stat burn or paralyze affect is being modified
+	ldh a, [hWhoseTurn]
+	push af
+	xor 1 ; flip the turn temporarily to make these run on whoever's turn it currently is instead of the opponent correctly
+	ldh [hWhoseTurn], a
+	ld a, [wWhatStat]
+	cp MOD_SPEED
+	call z, QuarterSpeedDueToParalysis ; apply speed penalty to the player whose turn it is, if it's paralyzed
+	ld a, [wWhatStat]
+	cp MOD_ATTACK
+	call z, HalveAttackDueToBurn ; apply attack penalty to the player whose turn it is, if it's burned
+	pop af
+	ldh [hWhoseTurn], a
+	ld a, $ff
+	ld [wWhatStat], a ; no longer modifying a stat
+	ret
+;;;;;;;;;;
 
 RestoreOriginalStatModifier:
 	pop hl
@@ -521,8 +553,15 @@ MonsStatsRoseText:
 	jr z, .playerTurn
 	ld a, [wEnemyMoveEffect]
 .playerTurn
+;;;;;;;;;; PureRGBnote: ADDED: these specific effects don't use "greatly rose" text
+	cp ATTACK_UP_SIDE_EFFECT
+	jr z, .rose
+	cp SPEED_UP_SIDE_EFFECT
+	jr z, .rose
+;;;;;;;;;;
 	cp ATTACK_DOWN1_EFFECT
 	ret nc
+.rose
 	ld hl, RoseText
 	ret
 
@@ -547,6 +586,7 @@ StatModifierDownEffect:
 	ld a, [wLinkState]
 	cp LINK_STATE_BATTLING
 	jr z, .statModifierDownEffect
+	; hardcoded 25% miss rate for opponents using stat down effect moves (feature in the original game) 
 	call BattleRandom
 	cp 25 percent + 1 ; chance to miss by in regular battle
 	jp c, MoveMissed
@@ -554,6 +594,11 @@ StatModifierDownEffect:
 	call CheckTargetSubstitute ; can't hit through substitute
 	jp nz, MoveMissed
 	ld a, [de]
+;;;;;;;;;; PureRGBnote: ADDED: need to decide which stat is being modified here and store it so we can apply correct badge boosts if necessary
+	call MapEffectToStat
+	ld [wWhatStat], a
+	ld a, [de]
+;;;;;;;;;;
 	cp ATTACK_DOWN_SIDE_EFFECT
 	jr c, .nonSideEffect
 	call BattleRandom
@@ -623,7 +668,7 @@ StatModifierDownEffect:
 .noCarry
 	pop bc
 	ld a, [hld]
-	sub $1 ; can't lower stat below 1 (-6)
+	dec a ; can't lower stat below 1 (-6)
 	jr nz, .recalculateStat
 	ld a, [hl]
 	and a
@@ -679,21 +724,31 @@ UpdateLoweredStatDone:
 	pop de
 	ld a, [de]
 	cp $44
-	jr nc, .ApplyBadgeBoostsAndStatusPenalties
-	call PlayCurrentMoveAnimation2
+	call c, PlayCurrentMoveAnimation2
 .ApplyBadgeBoostsAndStatusPenalties
 	ldh a, [hWhoseTurn]
 	and a
-	call nz, ApplyBadgeStatBoosts ; whenever the player uses a stat-down move, badge boosts get reapplied again to every stat,
+	call nz, ApplyBadgeBoostsForSpecificStat ; whenever the opponent uses a stat-down move, badge boosts get reapplied again to every stat,
 	                              ; even to those not affected by the stat-up move (will be boosted further)
+	                             ; PureRGBnote: FIXED: badge boosts only applied to the specific stat being modified
 	ld hl, MonsStatsFellText
 	call PrintText
 
 ; These where probably added given that a stat-down move affecting speed or attack will override
 ; the stat penalties from paralysis and burn respectively.
 ; But they are always called regardless of the stat affected by the stat-down move.
-	call QuarterSpeedDueToParalysis
-	jp HalveAttackDueToBurn
+;;;;;;;;;; PureRGBnote: FIXED: These only run if the specific stat burn or paralyze affect is being modified
+	ld a, [wWhatStat]
+	cp MOD_SPEED
+	call z, QuarterSpeedDueToParalysis ; apply speed penalty to the player whose turn it is, if it's paralyzed
+	ld a, [wWhatStat]
+	cp MOD_ATTACK
+	call z, HalveAttackDueToBurn ; apply attack penalty to the player whose turn it is, if it's burned
+	ld a, $ff
+	ld [wWhatStat], a ; no longer modifying a stat
+	ret
+;;;;;;;;;;
+
 
 CantLowerAnymore_Pop:
 	pop de
@@ -756,8 +811,8 @@ PrintStatText:
 	jp CopyData
 
 INCLUDE "data/battle/stat_mod_names.asm"
-
 INCLUDE "data/battle/stat_modifiers.asm"
+INCLUDE "data/battle/stat_mod_stat_mapping.asm"
 
 BideEffect:
 	ld hl, wPlayerBattleStatus1

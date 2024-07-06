@@ -446,7 +446,8 @@
 	const EVENT_BEAT_ROUTE_20_TRAINER_7
 	const EVENT_BEAT_ROUTE_20_TRAINER_8
 	const EVENT_BEAT_ROUTE_20_TRAINER_9
-	const_skip 3
+	const_skip 2
+	const EVENT_SEAFOAM_FOUND_OTHER_FOSSIL
 	const EVENT_SEAFOAM1_BOULDER1_DOWN_HOLE
 	const EVENT_SEAFOAM1_BOULDER2_DOWN_HOLE
 
@@ -551,7 +552,10 @@
 
 ; S.S. Anne events
 	const_next $5C0
-	const_skip 4
+	const_skip
+	const EVENT_ENCOUNTERED_MEW
+	const EVENT_FOUND_MEW
+	const_skip
 	const EVENT_BEAT_SS_ANNE_5_TRAINER_0
 	const EVENT_BEAT_SS_ANNE_5_TRAINER_1
 	const_skip 26

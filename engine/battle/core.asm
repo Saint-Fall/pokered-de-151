@@ -2752,6 +2752,11 @@ NoMovesLeftText:
 	text_end
 
 SwapMovesInMenu:
+;;;;; PureRGBnote: FIXED: can't swap moves when transformed (fixes a crash bug)
+	ld a, [wPlayerBattleStatus3]
+	bit TRANSFORMED, a ; transformed
+	jp nz, MoveSelectionMenu
+;;;;;
 	ld a, [wMenuItemToSwap]
 	and a
 	jr z, .noMenuItemSelected
@@ -3863,9 +3868,11 @@ PrintMoveFailureText:
 	ret nz
 
 	; if you get here, the mon used jump kick or hi jump kick and missed
-	ld hl, wDamage ; since the move missed, wDamage will always contain 0 at this point.
+	;ld hl, wDamage ; since the move missed, wDamage will always contain 0 at this point.
 	                ; Thus, recoil damage will always be equal to 1
 	                ; even if it was intended to be potential damage/8.
+
+	ld hl, wDamageIntention ; PureRGBnote: FIXED: this address now stores the damage that would have been done if it didn't miss
 	ld a, [hli]
 	ld b, [hl]
 	srl a
@@ -3874,6 +3881,7 @@ PrintMoveFailureText:
 	rr b
 	srl a
 	rr b
+	ld hl, wDamage+1
 	ld [hl], b
 	dec hl
 	ld [hli], a
@@ -4172,6 +4180,7 @@ GetDamageVarsForPlayerAttack:
 ; if the enemy has used Reflect, double the enemy's defense
 	sla c
 	rl b
+	call do999StatCap ; shinpokerednote: FIXED: cap reflect boosted stat at 999
 .physicalAttackCritCheck
 	ld hl, wBattleMonAttack
 	ld a, [wCriticalHitOrOHKO]
@@ -4204,6 +4213,7 @@ GetDamageVarsForPlayerAttack:
 	rl b
 ; reflect and light screen boosts do not cap the stat at MAX_STAT_VALUE, so weird things will happen during stats scaling
 ; if a Pokemon with 512 or more Defense has used Reflect, or if a Pokemon with 512 or more Special has used Light Screen
+	call do999StatCap ; shinpokerednote: FIXED: cap light screen boosted stat at 999
 .specialAttackCritCheck
 	ld hl, wBattleMonSpecial
 	ld a, [wCriticalHitOrOHKO]
@@ -4285,6 +4295,7 @@ GetDamageVarsForEnemyAttack:
 ; if the player has used Reflect, double the player's defense
 	sla c
 	rl b
+	call do999StatCap ; shinpokerednote: FIXED: cap reflect boosted stat at 999
 .physicalAttackCritCheck
 	ld hl, wEnemyMonAttack
 	ld a, [wCriticalHitOrOHKO]
@@ -4317,6 +4328,7 @@ GetDamageVarsForEnemyAttack:
 	rl b
 ; reflect and light screen boosts do not cap the stat at MAX_STAT_VALUE, so weird things will happen during stats scaling
 ; if a Pokemon with 512 or more Defense has used Reflect, or if a Pokemon with 512 or more Special has used Light Screen
+	call do999StatCap ; shinpokerednote: FIXED: cap light screen boosted stat at 999
 .specialAttackCritCheck
 	ld hl, wEnemyMonSpecial
 	ld a, [wCriticalHitOrOHKO]
@@ -4625,14 +4637,14 @@ CriticalHitTest:
 	ld c, [hl]                   ; read move id
 	ld a, [de]
 	bit GETTING_PUMPED, a        ; test for focus energy
-	jr nz, .focusEnergyUsed      ; bug: using focus energy causes a shift to the right instead of left,
+	jr z, .noFocusEnergyUsed     ; bug: using focus energy causes a shift to the right instead of left,
 	                             ; resulting in 1/4 the usual crit chance
-	sla b                        ; (effective (base speed/2)*2)
-	jr nc, .noFocusEnergyUsed
-	ld b, $ff                    ; cap at 255/256
-	jr .noFocusEnergyUsed
-.focusEnergyUsed
-	srl b
+;;;;;;;;;; PureRGBnote: FIXED: fix focus energy 
+	sla b                        
+	jr c, .capCritical
+	sla b 						 ; normal attacks have 4x crit rate under focus energy
+	jr c, .capCritical
+;;;;;;;;;;
 .noFocusEnergyUsed
 	ld hl, HighCriticalMoves     ; table of high critical hit moves
 .Loop
@@ -4642,16 +4654,17 @@ CriticalHitTest:
 	inc a                        ; move on to the next move, FF terminates loop
 	jr nz, .Loop                 ; check the next move in HighCriticalMoves
 	srl b                        ; /2 for regular move (effective (base speed / 2))
-	jr .SkipHighCritical         ; continue as a normal move
+	jr .finishcalc               ; continue as a normal move
 .HighCritical
-	sla b                        ; *2 for high critical hit moves
-	jr nc, .noCarry
-	ld b, $ff                    ; cap at 255/256
-.noCarry
-	sla b                        ; *4 for high critical move (effective (base speed/2)*8))
-	jr nc, .SkipHighCritical
+	sla b                        ; *2 for high critical hit moves (effective (base speed/2)*2))
+	jr c, .capCritical
+	sla b                        ; *4 for high critical hit moves (effective (base speed/2)*4))
+	jr c, .capCritical
+	sla b 						 ; *8 for high critical move (effective (base speed/2)*8))
+	jr nc, .finishcalc
+.capCritical
 	ld b, $ff
-.SkipHighCritical
+.finishcalc
 	call BattleRandom            ; generates a random value, in "a"
 	rlc a
 	rlc a
@@ -5447,6 +5460,15 @@ MoveHitTest:
 	jr nc, .moveMissed
 	ret
 .moveMissed
+;;;;;;;;;;;;;;;;;;;;
+;shinpokerednote: FIXED: if a move misses, store the damage it threatened into wDamageIntention.
+;this is so the Jump Kick effect works correctly
+	ld hl, wDamageIntention
+	ld a, [wDamage]
+	ld [hli], a
+	ld a, [wDamage + 1]
+	ld [hl], a
+;;;;;;;;;;;;;;;;;;;;
 	xor a
 	ld hl, wDamage ; zero the damage
 	ld [hli], a
@@ -6569,33 +6591,77 @@ CalculateModifiedStat:
 	pop bc
 	ret
 
-ApplyBadgeStatBoosts:
+;;;;;;;;;; PureRGBnote: FIXED: stat modifiers only badge boost the specific stat that was affected instead of all of them
+
+ApplyBadgeBoostsForSpecificStat: ;badge boosts a specific stat based on wWhatStat
 	ld a, [wLinkState]
 	cp LINK_STATE_BATTLING
 	ret z ; return if link battle
 	ld a, [wObtainedBadges]
-	ld b, a
+	ld d, a
+	ld a, [wWhatStat]
+	cp MOD_ATTACK
+	jr z, .Attack
+	cp MOD_DEFENSE
+	jr z, .Defense
+	cp MOD_SPEED
+	jr z, .Speed
+	cp MOD_SPECIAL
+	jr z, .Special
+	ret ; return if not a boosted stat
+.Attack
 	ld hl, wBattleMonAttack
-	ld c, $4
+	bit BIT_BOULDERBADGE, d
+	jr .done
+.Defense
+	ld hl, wBattleMonDefense
+	bit BIT_SOULBADGE, d
+	jr .done
+.Speed
+	ld hl, wBattleMonSpeed
+	bit BIT_THUNDERBADGE, d
+	jr .done
+.Special
+	ld hl, wBattleMonSpecial
+	bit BIT_VOLCANOBADGE, d
+.done
+	jp nz, ApplyBoostToStat
+	ret
+
+;;;;;;;;;;
+
+;;;;;;;;;; PureRGBnote: FIXED: thunderbadge boosts speed as the game's text indicates and soulbadge boosts defense.
+
+ApplyBadgeStatBoosts:
+	ld a, [wLinkState]
+	cp LINK_STATE_BATTLING
+	ret z ; return if link battle
 ; the boost is applied for badges whose bit position is even
 ; the order of boosts matches the order they are laid out in RAM
 ; Boulder (bit 0) - attack
-; Thunder (bit 2) - defense
-; Soul (bit 4) - speed
+; Thunder (bit 2) - speed
+; Soul (bit 4) - defense
 ; Volcano (bit 6) - special
-.loop
-	srl b
-	call c, .applyBoostToStat
-	inc hl
-	inc hl
-	srl b
-	dec c
-	jr nz, .loop
-	ret
+	ld a, [wObtainedBadges]
+	ld b, a
+	ld hl, wBattleMonAttack
+	bit BIT_BOULDERBADGE, b
+	call nz, ApplyBoostToStat
+	ld hl, wBattleMonSpeed
+	bit BIT_THUNDERBADGE, b
+	call nz, ApplyBoostToStat
+	ld hl, wBattleMonDefense
+	bit BIT_SOULBADGE, b
+	call nz, ApplyBoostToStat
+	ld hl, wBattleMonSpecial
+	bit BIT_VOLCANOBADGE, b
+	ret z
+	; fall through
+;;;;;;;;;;
 
 ; multiply stat at hl by 1.125
 ; cap stat at MAX_STAT_VALUE
-.applyBoostToStat
+ApplyBoostToStat:
 	ld a, [hli]
 	ld d, a
 	ld e, [hl]
@@ -6780,6 +6846,10 @@ DetermineWildOpponent:
 	callfar TryDoWildEncounter
 	ret nz
 InitBattleCommon:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; shinpokerednote: ADDED: store PKMN Levels at the beginning of the Battle.
+	farcall StorePKMNLevels
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	ld a, [wMapPalOffset]
 	push af
 	ld hl, wLetterPrintingDelayFlags
@@ -7038,3 +7108,23 @@ LoadMonBackPic:
 	ldh a, [hLoadedROMBank]
 	ld b, a
 	jp CopyVideoData
+
+;;;;;;;;;; shinpokerednote: FIXED: code for capping reflect/light screen stat boost at 999
+do999StatCap:
+	;b register contains high byte & c register contains low byte
+	ld a, c ;let's work on low byte first. Note that decimal 999 is $03E7 in hex.
+	sub MAX_STAT_VALUE % $100 ;a = a - ($03E7 % $100). Gives a = a - $E7. A byte % $100 always gives the lesser nibble.
+	;Note that if a < $E7 then the carry bit 'c' in the flag register gets set due to overflowing with a negative result.
+	ld a, b ;now let's work on the high byte
+	sbc MAX_STAT_VALUE / $100 ;a = a - ($03E7 / $100 + c_flag). Gives a = a - ($03 + c_flag). A byte / $100 always gives the greater nibble.
+	;Note again that if a < $03 then the carry bit remains set. 
+	;If the bit is already set from the lesser nibble, then its addition here can still make it remain set if a is low enough.
+	ret c ;jump to next marker if the c_flag is set. This only remains set if BC <  the cap of $03E7.
+	;else let's continue and set the 999 cap
+	ld a, MAX_STAT_VALUE / $100 ; else load $03 into a
+	ld b, a ;and store it as the high byte
+	ld a, MAX_STAT_VALUE % $100 ; else load $E7 into a
+	ld c, a ;and store it as the low byte
+	;now registers b & c together contain $03E7 for a capped stat value of 999
+	ret
+;;;;;;;;;;

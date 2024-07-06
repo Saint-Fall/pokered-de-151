@@ -16,7 +16,7 @@ _VermilionCityTextDidYouSee::
 	done
 
 _VermilionCityTextSSAnneDeparted::
-	text "Die M.S.ANNE ist"
+	text "Die M.S. ANNE ist"
 	line "ausgelaufen!"
 
 	para "Sie wird in einem"
@@ -137,3 +137,13 @@ _VermilionCityText13::
 	text "HAFEN VON"
 	line "ORANIA CITY"
 	done
+	
+_VermilionCityText15::
+	text "Die M.S. ANNE"
+	line "ist zurück!"
+	
+	para "Nach einer langen"
+	line "Reise ankert sie"
+	cont "wieder im Hafen."
+	done
+	
